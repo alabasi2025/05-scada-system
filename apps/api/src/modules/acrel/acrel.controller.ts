@@ -71,4 +71,30 @@ export class AcrelController {
   sendCommandToAcrel(@Param('id') id: string, @Body() command: any) {
     return this.service.sendCommandToAcrel(id, command);
   }
+
+  // ==================== Webhooks ====================
+
+  @Post('webhooks/readings')
+  @ApiOperation({ summary: 'Webhook لاستقبال بيانات القراءات من Acrel' })
+  handleReadingsWebhook(@Body() payload: any) {
+    return this.service.handleReadingsWebhook(payload);
+  }
+
+  @Post('webhooks/alerts')
+  @ApiOperation({ summary: 'Webhook لاستقبال التنبيهات من Acrel' })
+  handleAlertsWebhook(@Body() payload: any) {
+    return this.service.handleAlertsWebhook(payload);
+  }
+
+  @Post('webhooks/status')
+  @ApiOperation({ summary: 'Webhook لاستقبال حالة الأجهزة من Acrel' })
+  handleStatusWebhook(@Body() payload: any) {
+    return this.service.handleStatusWebhook(payload);
+  }
+
+  @Post('webhooks/control')
+  @ApiOperation({ summary: 'Webhook لاستقبال نتائج التحكم من Acrel' })
+  handleControlWebhook(@Body() payload: any) {
+    return this.service.handleControlWebhook(payload);
+  }
 }

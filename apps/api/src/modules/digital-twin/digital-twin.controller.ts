@@ -101,6 +101,20 @@ export class DigitalTwinController {
     return this.service.updateLocation(id, data);
   }
 
+  // Network Map
+  @Get('network-map')
+  @ApiOperation({ summary: 'خريطة الشبكة الكاملة (GeoJSON)' })
+  getNetworkMap(@Query('stationId') stationId?: string) {
+    return this.service.getNetworkMap(stationId);
+  }
+
+  // Voltage Drop Analysis
+  @Get('voltage-drop')
+  @ApiOperation({ summary: 'تحليل هبوط الجهد' })
+  analyzeVoltageDrop(@Query('segmentId') segmentId?: string) {
+    return this.service.analyzeVoltageDrop(segmentId);
+  }
+
   // Statistics
   @Get('stats')
   @ApiOperation({ summary: 'إحصائيات الشبكة' })

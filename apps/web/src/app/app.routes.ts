@@ -39,6 +39,19 @@ export const routes: Routes = [
         path: 'reports', 
         loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) 
       },
+      // لوحات المراقبة المتقدمة
+      { 
+        path: 'quality', 
+        loadComponent: () => import('./features/quality/quality-dashboard.component').then(m => m.QualityDashboardComponent) 
+      },
+      { 
+        path: 'energy', 
+        loadComponent: () => import('./features/energy/energy-dashboard.component').then(m => m.EnergyDashboardComponent) 
+      },
+      { 
+        path: 'security', 
+        loadComponent: () => import('./features/security/security-dashboard.component').then(m => m.SecurityDashboardComponent) 
+      },
       { 
         path: 'test', 
         loadComponent: () => import('./features/test/test.component').then(m => m.TestComponent) 

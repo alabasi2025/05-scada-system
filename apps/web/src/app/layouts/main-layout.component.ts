@@ -71,5 +71,8 @@ export class MainLayoutComponent {
     { label: 'الأوامر', icon: 'pi pi-cog', routerLink: '/commands' },
     { label: 'الخريطة', icon: 'pi pi-map', routerLink: '/map' },
     { label: 'التقارير', icon: 'pi pi-chart-bar', routerLink: '/reports' },
+    { label: 'جودة الطاقة', icon: 'pi pi-gauge', routerLink: '/quality' },
+    { label: 'الاستهلاك', icon: 'pi pi-bolt', routerLink: '/energy' },
+    { label: 'الأمان', icon: 'pi pi-shield', routerLink: '/security' },
   ];
 }
