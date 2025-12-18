@@ -115,7 +115,7 @@ model monitoring_points {
   alerts        alerts[]
 
   @@unique([stationId, pointCode])
-  @@map("monitoring_points")
+  @@map("scada_monitoring_points")
 }
 
 /// القراءات الحية (live_readings)
@@ -131,7 +131,7 @@ model live_readings {
   point       monitoring_points @relation(fields: [pointId], references: [id])
 
   @@index([pointId, readingTime])
-  @@map("live_readings")
+  @@map("scada_live_readings")
 }
 
 /// سجل القراءات (readings_history)
@@ -148,7 +148,7 @@ model readings_history {
 
   @@index([pointId, readingTime])
   @@index([aggregationType, readingTime])
-  @@map("readings_history")
+  @@map("scada_readings_history")
 }
 
 /// التنبيهات (alerts)
@@ -183,7 +183,7 @@ model alerts {
   @@index([stationId])
   @@index([severity])
   @@index([status])
-  @@map("alerts")
+  @@map("scada_alerts")
 }
 
 /// قواعد التنبيهات (alert_rules)
@@ -203,7 +203,7 @@ model alert_rules {
   isActive              Boolean  @default(true) @map("is_active")
   createdAt             DateTime @default(now()) @map("created_at")
 
-  @@map("alert_rules")
+  @@map("scada_alert_rules")
 }
 
 /// أوامر التحكم (control_commands)
@@ -231,7 +231,7 @@ model control_commands {
 
   @@index([stationId])
   @@index([status])
-  @@map("control_commands")
+  @@map("scada_control_commands")
 }
 
 // ============================================
@@ -265,7 +265,7 @@ model energy_summary {
 
   @@unique([stationId, summaryDate, summaryType])
   @@index([summaryDate])
-  @@map("energy_summary")
+  @@map("scada_energy_summary")
 }
 
 /// تحليل الاستهلاك (consumption_analysis)
@@ -285,7 +285,7 @@ model consumption_analysis {
   createdAt            DateTime @default(now()) @map("created_at")
 
   @@index([analysisDate])
-  @@map("consumption_analysis")
+  @@map("scada_consumption_analysis")
 }
 
 /// توقعات الطلب (demand_forecast)
@@ -303,7 +303,7 @@ model demand_forecast {
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([forecastDate])
-  @@map("demand_forecast")
+  @@map("scada_demand_forecast")
 }
 
 // ============================================
@@ -329,7 +329,7 @@ model quality_metrics {
   station           scada_stations @relation(fields: [stationId], references: [id])
 
   @@index([metricDate])
-  @@map("quality_metrics")
+  @@map("scada_quality_metrics")
 }
 
 /// مؤشرات الموثوقية (reliability_metrics)
@@ -354,7 +354,7 @@ model reliability_metrics {
   station              scada_stations @relation(fields: [stationId], references: [id])
 
   @@index([periodStart, periodEnd])
-  @@map("reliability_metrics")
+  @@map("scada_reliability_metrics")
 }
 
 /// الحوادث (incidents)
@@ -385,7 +385,7 @@ model incidents {
 
   @@index([incidentType])
   @@index([status])
-  @@map("incidents")
+  @@map("scada_incidents")
 }
 
 /// الفحوصات (safety_inspections)
@@ -412,7 +412,7 @@ model safety_inspections {
 
   @@index([scheduledDate])
   @@index([status])
-  @@map("safety_inspections")
+  @@map("scada_safety_inspections")
 }
 
 // ============================================
@@ -439,7 +439,7 @@ model access_points {
   accessLogs   access_log[]
 
   @@unique([stationId, pointCode])
-  @@map("access_points")
+  @@map("scada_access_points")
 }
 
 /// سجل الوصول (access_log)
@@ -458,7 +458,7 @@ model access_log {
   accessPoint   access_points @relation(fields: [accessPointId], references: [id])
 
   @@index([accessTime])
-  @@map("access_log")
+  @@map("scada_access_log")
 }
 
 /// الكاميرات (cameras)
@@ -482,7 +482,7 @@ model cameras {
   station          scada_stations @relation(fields: [stationId], references: [id])
 
   @@unique([stationId, cameraCode])
-  @@map("cameras")
+  @@map("scada_cameras")
 }
 
 /// أحداث الأمان (security_events)
@@ -510,7 +510,7 @@ model security_events {
 
   @@index([eventType])
   @@index([status])
-  @@map("security_events")
+  @@map("scada_security_events")
 }
 
 // ============================================
@@ -542,7 +542,7 @@ model integrated_devices {
   station          scada_stations @relation(fields: [stationId], references: [id])
   communicationLogs device_communication_log[]
 
-  @@map("integrated_devices")
+  @@map("scada_integrated_devices")
 }
 
 /// سجل الاتصالات (device_communication_log)
@@ -562,7 +562,7 @@ model device_communication_log {
   device            integrated_devices @relation(fields: [deviceId], references: [id])
 
   @@index([communicationTime])
-  @@map("device_communication_log")
+  @@map("scada_device_communication_log")
 }
 
 /// مهام المزامنة (sync_tasks)
@@ -582,7 +582,7 @@ model sync_tasks {
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  @@map("sync_tasks")
+  @@map("scada_sync_tasks")
 }
 
 /// سجل الفصل/الوصل (meter_control_log)
@@ -604,7 +604,7 @@ model meter_control_log {
 
   @@index([meterId])
   @@index([actionType])
-  @@map("meter_control_log")
+  @@map("scada_meter_control_log")
 }
 
 // ============================================
@@ -621,7 +621,7 @@ model system_settings {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("system_settings")
+  @@map("scada_system_settings")
 }
 
 /// سجل الأحداث (event_logs)
@@ -640,7 +640,7 @@ model event_logs {
   @@index([eventType])
   @@index([entityType, entityId])
   @@index([createdAt])
-  @@map("event_logs")
+  @@map("scada_event_logs")
 }
 
 /// الإشعارات (notifications)
@@ -659,7 +659,7 @@ model notifications {
 
   @@index([userId])
   @@index([status])
-  @@map("notifications")
+  @@map("scada_notifications")
 }
 
 
@@ -690,7 +690,7 @@ model geo_locations {
   @@unique([entityType, entityId, locationType])
   @@index([latitude, longitude])
   @@index([entityType, entityId])
-  @@map("geo_locations")
+  @@map("scada_geo_locations")
 }
 
 /// عقد الشبكة (network_nodes)
@@ -721,7 +721,7 @@ model network_nodes {
   @@index([nodeType])
   @@index([stationId])
   @@index([latitude, longitude])
-  @@map("network_nodes")
+  @@map("scada_network_nodes")
 }
 
 /// مكونات العقدة (node_components)
@@ -743,7 +743,7 @@ model node_components {
   // العلاقات
   node              network_nodes @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
-  @@map("node_components")
+  @@map("scada_node_components")
 }
 
 /// مقاطع الشبكة (network_segments)
@@ -773,5 +773,5 @@ model network_segments {
   fromNode          network_nodes @relation("FromNode", fields: [fromNodeId], references: [id])
   toNode            network_nodes @relation("ToNode", fields: [toNodeId], references: [id])
 
-  @@map("network_segments")
+  @@map("scada_network_segments")
 }

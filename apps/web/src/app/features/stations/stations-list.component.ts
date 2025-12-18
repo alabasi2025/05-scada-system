@@ -1,11 +1,17 @@
 import { Component, OnInit, inject, signal, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { DialogModule } from 'primeng/dialog';
+import { Select } from 'primeng/select';
+import { ToastModule } from 'primeng/toast';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
@@ -18,6 +24,9 @@ interface Station {
   voltageLevel: string;
   capacity?: string;
   status: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   _count?: {
     devices: number;
     monitoringPoints: number;
@@ -28,15 +37,27 @@ interface Station {
 @Component({
   selector: 'app-stations-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, TableModule, TagModule, ButtonModule, InputTextModule, ProgressSpinnerModule],
+  imports: [
+    CommonModule, RouterModule, FormsModule, TableModule, TagModule, ButtonModule, 
+    InputTextModule, ProgressSpinnerModule, DialogModule, Select, 
+    ToastModule, ConfirmDialogModule
+  ],
+  providers: [MessageService, ConfirmationService],
   template: `
+    <p-toast></p-toast>
+    <p-confirmDialog></p-confirmDialog>
+    
     <div class="scada-card">
-      <div class="scada-card-header">
-        <h2 class="scada-card-title">
-          <i class="pi pi-building ml-2"></i>
-          قائمة المحطات
-        </h2>
-        <span class="text-slate-500">إجمالي: {{ total() }} محطة</span>
+      <div class="scada-card-header flex justify-between items-center">
+        <div>
+          <h2 class="scada-card-title">
+            <i class="pi pi-building ml-2"></i>
+            قائمة المحطات
+          </h2>
+          <span class="text-slate-500">إجمالي: {{ total() }} محطة</span>
+        </div>
+        <button pButton label="إضافة محطة" icon="pi pi-plus" 
+                class="p-button-success" (click)="openCreateDialog()"></button>
       </div>
 
       <!-- Loading State -->
@@ -90,7 +111,11 @@ interface Station {
                         [routerLink]="['/stations', station.id]"
                         pTooltip="عرض التفاصيل"></button>
                 <button pButton icon="pi pi-pencil" class="p-button-text p-button-sm p-button-warning"
+                        (click)="openEditDialog(station)"
                         pTooltip="تعديل"></button>
+                <button pButton icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger"
+                        (click)="confirmDelete(station)"
+                        pTooltip="حذف"></button>
               </td>
             </tr>
             <tr *ngIf="stations().length === 0">
@@ -103,17 +128,89 @@ interface Station {
         </table>
       </div>
     </div>
+
+    <!-- Create/Edit Dialog -->
+    <p-dialog [(visible)]="dialogVisible" [header]="editMode ? 'تعديل محطة' : 'إضافة محطة جديدة'" 
+              [modal]="true" [style]="{width: '500px'}" [draggable]="false">
+      <div class="grid gap-4">
+        <div>
+          <label class="block mb-1 font-semibold">الكود *</label>
+          <input pInputText [(ngModel)]="formData.code" class="w-full" [disabled]="editMode" />
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">الاسم بالعربية *</label>
+          <input pInputText [(ngModel)]="formData.name" class="w-full" />
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">الاسم بالإنجليزية</label>
+          <input pInputText [(ngModel)]="formData.nameEn" class="w-full" />
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">النوع *</label>
+          <p-select [options]="stationTypes" [(ngModel)]="formData.type" 
+                      optionLabel="label" optionValue="value" class="w-full"></p-select>
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">مستوى الجهد</label>
+          <p-select [options]="voltageLevels" [(ngModel)]="formData.voltageLevel" 
+                      optionLabel="label" optionValue="value" class="w-full"></p-select>
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">السعة (MVA)</label>
+          <input pInputText type="number" [(ngModel)]="formData.capacity" class="w-full" />
+        </div>
+        <div>
+          <label class="block mb-1 font-semibold">العنوان</label>
+          <input pInputText [(ngModel)]="formData.address" class="w-full" />
+        </div>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="إلغاء" icon="pi pi-times" class="p-button-text" (click)="dialogVisible = false"></button>
+        <button pButton [label]="editMode ? 'تحديث' : 'حفظ'" icon="pi pi-check" 
+                [loading]="saving" (click)="saveStation()"></button>
+      </ng-template>
+    </p-dialog>
   `,
 })
 export class StationsListComponent implements OnInit {
   private http = inject(HttpClient);
   private cdr = inject(ChangeDetectorRef);
+  private messageService = inject(MessageService);
+  private confirmationService = inject(ConfirmationService);
   private apiUrl = environment.apiUrl;
 
   loading = signal(true);
   error = signal<string | null>(null);
   stations = signal<Station[]>([]);
   total = signal(0);
+
+  dialogVisible = false;
+  editMode = false;
+  saving = false;
+  selectedStation: Station | null = null;
+
+  formData = {
+    code: '',
+    name: '',
+    nameEn: '',
+    type: 'main',
+    voltageLevel: 'HV',
+    capacity: 0,
+    address: ''
+  };
+
+  stationTypes = [
+    { label: 'رئيسية', value: 'main' },
+    { label: 'فرعية', value: 'substation' },
+    { label: 'توزيعية', value: 'distribution' },
+    { label: 'شمسية', value: 'solar' }
+  ];
+
+  voltageLevels = [
+    { label: 'جهد عالي (HV)', value: 'HV' },
+    { label: 'جهد متوسط (MV)', value: 'MV' },
+    { label: 'جهد منخفض (LV)', value: 'LV' }
+  ];
 
   ngOnInit() {
     this.loadStations();
@@ -125,7 +222,6 @@ export class StationsListComponent implements OnInit {
 
     this.http.get<any>(`${this.apiUrl}/v1/scada/stations`).subscribe({
       next: (response) => {
-        console.log('Stations list response:', response);
         const stationsData = response?.data || [];
         this.stations.set(stationsData);
         this.total.set(response?.meta?.total || stationsData.length);
@@ -134,9 +230,103 @@ export class StationsListComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error loading stations:', err);
-        this.error.set('فشل في تحميل المحطات');
+        this.error.set(err.error?.message || 'فشل في تحميل المحطات');
         this.loading.set(false);
       },
+    });
+  }
+
+  openCreateDialog() {
+    this.editMode = false;
+    this.selectedStation = null;
+    this.formData = {
+      code: '',
+      name: '',
+      nameEn: '',
+      type: 'main',
+      voltageLevel: 'HV',
+      capacity: 0,
+      address: ''
+    };
+    this.dialogVisible = true;
+  }
+
+  openEditDialog(station: Station) {
+    this.editMode = true;
+    this.selectedStation = station;
+    this.formData = {
+      code: station.code,
+      name: station.name,
+      nameEn: station.nameEn || '',
+      type: station.type,
+      voltageLevel: station.voltageLevel,
+      capacity: parseFloat(station.capacity || '0'),
+      address: station.address || ''
+    };
+    this.dialogVisible = true;
+  }
+
+  saveStation() {
+    if (!this.formData.code || !this.formData.name || !this.formData.type) {
+      this.messageService.add({ severity: 'error', summary: 'خطأ', detail: 'يرجى ملء الحقول المطلوبة' });
+      return;
+    }
+
+    this.saving = true;
+    const url = this.editMode 
+      ? `${this.apiUrl}/v1/scada/stations/${this.selectedStation?.id}`
+      : `${this.apiUrl}/v1/scada/stations`;
+    
+    const request = this.editMode 
+      ? this.http.put(url, this.formData)
+      : this.http.post(url, this.formData);
+
+    request.subscribe({
+      next: () => {
+        this.messageService.add({ 
+          severity: 'success', 
+          summary: 'نجاح', 
+          detail: this.editMode ? 'تم تحديث المحطة بنجاح' : 'تم إنشاء المحطة بنجاح' 
+        });
+        this.dialogVisible = false;
+        this.saving = false;
+        this.loadStations();
+      },
+      error: (err) => {
+        this.messageService.add({ 
+          severity: 'error', 
+          summary: 'خطأ', 
+          detail: err.error?.message || 'فشل في حفظ المحطة' 
+        });
+        this.saving = false;
+      }
+    });
+  }
+
+  confirmDelete(station: Station) {
+    this.confirmationService.confirm({
+      message: `هل أنت متأكد من حذف المحطة "${station.name}"؟`,
+      header: 'تأكيد الحذف',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'نعم، احذف',
+      rejectLabel: 'إلغاء',
+      accept: () => this.deleteStation(station)
+    });
+  }
+
+  deleteStation(station: Station) {
+    this.http.delete(`${this.apiUrl}/v1/scada/stations/${station.id}`).subscribe({
+      next: () => {
+        this.messageService.add({ severity: 'success', summary: 'نجاح', detail: 'تم حذف المحطة بنجاح' });
+        this.loadStations();
+      },
+      error: (err) => {
+        this.messageService.add({ 
+          severity: 'error', 
+          summary: 'خطأ', 
+          detail: err.error?.message || 'فشل في حذف المحطة' 
+        });
+      }
     });
   }
 

@@ -1,0 +1,120 @@
+# =============================================
+# نظام SCADA - Docker Compose
+# =============================================
+# الاستخدام:
+#   docker-compose up -d          # تشغيل جميع الخدمات
+#   docker-compose down           # إيقاف جميع الخدمات
+#   docker-compose logs -f        # عرض السجلات
+# =============================================
+
+version: '3.8'
+
+services:
+  # =============================================
+  # قاعدة البيانات PostgreSQL
+  # =============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: scada_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-scada_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-scada_pass123}
+      POSTGRES_DB: ${DB_NAME:-scada_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-scada_user} -d ${DB_NAME:-scada_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scada_network
+
+  # =============================================
+  # Backend API (NestJS)
+  # =============================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: scada_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-scada_user}:${DB_PASSWORD:-scada_pass123}@postgres:5432/${DB_NAME:-scada_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-scada_jwt_secret_key_2025}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - scada_network
+
+  # =============================================
+  # Frontend Web (Angular + Nginx)
+  # =============================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: scada_web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - scada_network
+
+  # =============================================
+  # Redis (للتخزين المؤقت والجلسات)
+  # =============================================
+  redis:
+    image: redis:7-alpine
+    container_name: scada_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scada_network
+
+# =============================================
+# Volumes
+# =============================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# =============================================
+# Networks
+# =============================================
+networks:
+  scada_network:
+    driver: bridge
