@@ -1,37 +1,19 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  ParseUUIDPipe,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { StationsService } from './stations.service';
-import { CreateStationDto, UpdateStationDto, StationQueryDto, StationResponseDto } from './dto';
+import { CreateStationDto, UpdateStationDto, StationQueryDto } from './dto';
 
-@ApiTags('المحطات الكهربائية')
-@Controller('stations')
+@ApiTags('المحطات - Stations')
+@Controller('v1/scada/stations')
 export class StationsController {
   constructor(private readonly stationsService: StationsService) {}
 
   @Post()
   @ApiOperation({ summary: 'إنشاء محطة جديدة' })
-  @ApiResponse({ status: 201, description: 'تم إنشاء المحطة بنجاح', type: StationResponseDto })
+  @ApiResponse({ status: 201, description: 'تم إنشاء المحطة بنجاح' })
   @ApiResponse({ status: 409, description: 'المحطة موجودة مسبقاً' })
-  create(@Body() createStationDto: CreateStationDto) {
-    return this.stationsService.create(createStationDto);
+  create(@Body() dto: CreateStationDto) {
+    return this.stationsService.create(dto);
   }
 
   @Get()
@@ -41,39 +23,47 @@ export class StationsController {
     return this.stationsService.findAll(query);
   }
 
-  @Get('map')
-  @ApiOperation({ summary: 'جلب بيانات المحطات للخريطة' })
-  @ApiResponse({ status: 200, description: 'بيانات المحطات للخريطة' })
-  getMapData() {
-    return this.stationsService.getMapData();
+  @Get('stats')
+  @ApiOperation({ summary: 'إحصائيات المحطات' })
+  @ApiResponse({ status: 200, description: 'إحصائيات المحطات' })
+  getStats() {
+    return this.stationsService.getStats();
   }
 
-  @Get('statistics')
-  @ApiOperation({ summary: 'جلب إحصائيات المحطات' })
-  @ApiResponse({ status: 200, description: 'إحصائيات المحطات' })
-  getStatistics() {
-    return this.stationsService.getStatistics();
+  @Get('code/:code')
+  @ApiOperation({ summary: 'جلب محطة بالكود' })
+  @ApiParam({ name: 'code', description: 'كود المحطة' })
+  @ApiResponse({ status: 200, description: 'تفاصيل المحطة' })
+  @ApiResponse({ status: 404, description: 'المحطة غير موجودة' })
+  findByCode(@Param('code') code: string) {
+    return this.stationsService.findByCode(code);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'جلب محطة محددة' })
+  @ApiOperation({ summary: 'جلب محطة بالمعرف' })
   @ApiParam({ name: 'id', description: 'معرف المحطة' })
-  @ApiResponse({ status: 200, description: 'بيانات المحطة', type: StationResponseDto })
+  @ApiResponse({ status: 200, description: 'تفاصيل المحطة' })
   @ApiResponse({ status: 404, description: 'المحطة غير موجودة' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Param('id') id: string) {
     return this.stationsService.findOne(id);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'تحديث محطة' })
   @ApiParam({ name: 'id', description: 'معرف المحطة' })
-  @ApiResponse({ status: 200, description: 'تم تحديث المحطة بنجاح', type: StationResponseDto })
+  @ApiResponse({ status: 200, description: 'تم تحديث المحطة بنجاح' })
   @ApiResponse({ status: 404, description: 'المحطة غير موجودة' })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateStationDto: UpdateStationDto,
-  ) {
-    return this.stationsService.update(id, updateStationDto);
+  update(@Param('id') id: string, @Body() dto: UpdateStationDto) {
+    return this.stationsService.update(id, dto);
+  }
+
+  @Put(':id/status')
+  @ApiOperation({ summary: 'تحديث حالة المحطة' })
+  @ApiParam({ name: 'id', description: 'معرف المحطة' })
+  @ApiQuery({ name: 'status', description: 'الحالة الجديدة', enum: ['online', 'offline', 'maintenance'] })
+  @ApiResponse({ status: 200, description: 'تم تحديث الحالة بنجاح' })
+  updateStatus(@Param('id') id: string, @Query('status') status: string) {
+    return this.stationsService.updateStatus(id, status);
   }
 
   @Delete(':id')
@@ -82,45 +72,7 @@ export class StationsController {
   @ApiParam({ name: 'id', description: 'معرف المحطة' })
   @ApiResponse({ status: 204, description: 'تم حذف المحطة بنجاح' })
   @ApiResponse({ status: 404, description: 'المحطة غير موجودة' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.stationsService.remove(id);
-  }
-
-  @Get(':id/devices')
-  @ApiOperation({ summary: 'جلب أجهزة المحطة' })
-  @ApiParam({ name: 'id', description: 'معرف المحطة' })
-  @ApiResponse({ status: 200, description: 'قائمة أجهزة المحطة' })
-  getDevices(@Param('id', ParseUUIDPipe) id: string) {
-    return this.stationsService.getDevices(id);
-  }
-
-  @Get(':id/readings')
-  @ApiOperation({ summary: 'جلب قراءات المحطة' })
-  @ApiParam({ name: 'id', description: 'معرف المحطة' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'تاريخ البداية' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'تاريخ النهاية' })
-  @ApiResponse({ status: 200, description: 'قراءات المحطة' })
-  getReadings(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.stationsService.getReadings(
-      id,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-    );
-  }
-
-  @Get(':id/alarms')
-  @ApiOperation({ summary: 'جلب تنبيهات المحطة' })
-  @ApiParam({ name: 'id', description: 'معرف المحطة' })
-  @ApiQuery({ name: 'status', required: false, description: 'حالة التنبيه' })
-  @ApiResponse({ status: 200, description: 'تنبيهات المحطة' })
-  getAlarms(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('status') status?: string,
-  ) {
-    return this.stationsService.getAlarms(id, status);
   }
 }

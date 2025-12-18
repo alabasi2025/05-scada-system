@@ -1,28 +1,21 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsUUID, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsEnum, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum StationType {
   MAIN = 'main',
-  SUB = 'sub',
+  SUBSTATION = 'substation',
   DISTRIBUTION = 'distribution',
-  SOLAR = 'solar',
-}
-
-export enum StationVoltage {
-  KV33 = '33kv',
-  KV11 = '11kv',
-  KV04 = '0.4kv',
+  SOLAR = 'solar'
 }
 
 export enum StationStatus {
   ONLINE = 'online',
   OFFLINE = 'offline',
-  MAINTENANCE = 'maintenance',
+  MAINTENANCE = 'maintenance'
 }
 
 export class CreateStationDto {
-  @ApiProperty({ description: 'رمز المحطة الفريد', example: 'STN-001' })
+  @ApiProperty({ description: 'كود المحطة الفريد', example: 'STN-001' })
   @IsString()
   code: string;
 
@@ -30,139 +23,126 @@ export class CreateStationDto {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ description: 'اسم المحطة بالإنجليزية', example: 'Riyadh Main Station' })
+  @ApiPropertyOptional({ description: 'اسم المحطة بالإنجليزية' })
   @IsOptional()
   @IsString()
   nameEn?: string;
 
-  @ApiProperty({ description: 'نوع المحطة', enum: StationType, example: StationType.MAIN })
+  @ApiProperty({ enum: StationType, description: 'نوع المحطة' })
   @IsEnum(StationType)
   type: StationType;
 
-  @ApiProperty({ description: 'جهد المحطة', enum: StationVoltage, example: StationVoltage.KV33 })
-  @IsEnum(StationVoltage)
-  voltage: StationVoltage;
+  @ApiPropertyOptional({ description: 'مستوى الجهد', example: 'HV' })
+  @IsOptional()
+  @IsString()
+  voltageLevel?: string;
 
-  @ApiPropertyOptional({ description: 'سعة المحطة (MVA)', example: 100.5 })
+  @ApiPropertyOptional({ description: 'خط العرض' })
   @IsOptional()
   @IsNumber()
-  @Type(() => Number)
-  capacity?: number;
-
-  @ApiPropertyOptional({ description: 'خط العرض', example: 24.7136 })
-  @IsOptional()
-  @IsNumber()
-  @Min(-90)
-  @Max(90)
-  @Type(() => Number)
   latitude?: number;
 
-  @ApiPropertyOptional({ description: 'خط الطول', example: 46.6753 })
+  @ApiPropertyOptional({ description: 'خط الطول' })
   @IsOptional()
   @IsNumber()
-  @Min(-180)
-  @Max(180)
-  @Type(() => Number)
   longitude?: number;
 
-  @ApiPropertyOptional({ description: 'العنوان', example: 'شارع الملك فهد، الرياض' })
+  @ApiPropertyOptional({ description: 'العنوان' })
   @IsOptional()
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional({ description: 'تاريخ التشغيل', example: '2024-01-15' })
+  @ApiPropertyOptional({ description: 'السعة بـ MVA' })
   @IsOptional()
-  @IsDateString()
-  commissionDate?: string;
+  @IsNumber()
+  capacity?: number;
 
-  @ApiPropertyOptional({ description: 'حالة المحطة', enum: StationStatus, default: StationStatus.ONLINE })
+  @ApiPropertyOptional({ description: 'معرف المجموعة' })
   @IsOptional()
-  @IsEnum(StationStatus)
-  status?: StationStatus;
+  @IsUUID()
+  businessId?: string;
 }
 
-export class UpdateStationDto extends PartialType(CreateStationDto) {}
-
-export class StationQueryDto {
-  @ApiPropertyOptional({ description: 'رقم الصفحة', default: 1 })
+export class UpdateStationDto {
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  page?: number = 1;
+  @IsString()
+  name?: string;
 
-  @ApiPropertyOptional({ description: 'عدد العناصر في الصفحة', default: 10 })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  @Min(1)
-  @Max(100)
-  limit?: number = 10;
+  @IsString()
+  nameEn?: string;
 
-  @ApiPropertyOptional({ description: 'نوع المحطة', enum: StationType })
+  @ApiPropertyOptional({ enum: StationType })
   @IsOptional()
   @IsEnum(StationType)
   type?: StationType;
 
-  @ApiPropertyOptional({ description: 'حالة المحطة', enum: StationStatus })
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  voltageLevel?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  capacity?: number;
+
+  @ApiPropertyOptional({ enum: StationStatus })
   @IsOptional()
   @IsEnum(StationStatus)
   status?: StationStatus;
 
-  @ApiPropertyOptional({ description: 'جهد المحطة', enum: StationVoltage })
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(StationVoltage)
-  voltage?: StationVoltage;
+  @IsBoolean()
+  isActive?: boolean;
+}
 
-  @ApiPropertyOptional({ description: 'البحث بالاسم أو الرمز' })
+export class StationQueryDto {
+  @ApiPropertyOptional({ enum: StationType })
+  @IsOptional()
+  @IsEnum(StationType)
+  type?: StationType;
+
+  @ApiPropertyOptional({ enum: StationStatus })
+  @IsOptional()
+  @IsEnum(StationStatus)
+  status?: StationStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   search?: string;
-}
 
-export class StationResponseDto {
-  @ApiProperty()
-  id: string;
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
 
-  @ApiProperty()
-  code: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiPropertyOptional()
-  nameEn?: string;
-
-  @ApiProperty()
-  type: string;
-
-  @ApiProperty()
-  voltage: string;
-
-  @ApiPropertyOptional()
-  capacity?: number;
-
-  @ApiPropertyOptional()
-  latitude?: number;
-
-  @ApiPropertyOptional()
-  longitude?: number;
-
-  @ApiPropertyOptional()
-  address?: string;
-
-  @ApiPropertyOptional()
-  commissionDate?: Date;
-
-  @ApiProperty()
-  status: string;
-
-  @ApiPropertyOptional()
-  lastSyncAt?: Date;
-
-  @ApiProperty()
-  createdAt: Date;
-
-  @ApiProperty()
-  updatedAt: Date;
+  @ApiPropertyOptional({ default: 20 })
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
 }

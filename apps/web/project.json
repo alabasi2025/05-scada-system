@@ -55,7 +55,8 @@
       "continuous": true,
       "executor": "@angular/build:dev-server",
       "options": {
-        "allowedHosts": ["all", "4200-i42d90on3akw5s88ha131-182bb932.manusvm.computer", ".manusvm.computer"]
+        "allowedHosts": ["all", "4200-i42d90on3akw5s88ha131-182bb932.manusvm.computer", ".manusvm.computer"],
+        "proxyConfig": "apps/web/proxy.conf.json"
       },
       "configurations": {
         "production": {

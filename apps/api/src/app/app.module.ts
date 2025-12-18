@@ -6,24 +6,25 @@ import { ScheduleModule } from '@nestjs/schedule';
 // Common Modules
 import { PrismaModule } from '../common/prisma/prisma.module';
 
-// Feature Modules
+// Feature Modules - SCADA Core
 import { StationsModule } from '../modules/stations/stations.module';
 import { DevicesModule } from '../modules/devices/devices.module';
-import { DataPointsModule } from '../modules/data-points/data-points.module';
+import { MonitoringPointsModule } from '../modules/monitoring-points/monitoring_points.module';
 import { ReadingsModule } from '../modules/readings/readings.module';
-import { ReadingsAggregatedModule } from '../modules/readings-aggregated/readings-aggregated.module';
-import { AlarmsModule } from '../modules/alarms/alarms.module';
-import { AlarmRulesModule } from '../modules/alarm-rules/alarm-rules.module';
-import { AlarmEngineModule } from '../modules/alarm-engine/alarm-engine.module';
+import { AlertsModule } from '../modules/alerts/alerts.module';
 import { CommandsModule } from '../modules/commands/commands.module';
-import { ConnectionsModule } from '../modules/connections/connections.module';
-import { EventLogsModule } from '../modules/event-logs/event-logs.module';
-import { SettingsModule } from '../modules/settings/settings.module';
-import { DataCollectorModule } from '../modules/data-collector/data-collector.module';
-import { CommandExecutorModule } from '../modules/command-executor/command-executor.module';
-import { ReportsModule } from '../modules/reports/reports.module';
+import { EnergyModule } from '../modules/energy/energy.module';
 import { HealthModule } from '../modules/health/health.module';
-import { WebsocketModule } from '../modules/websocket/websocket.module';
+
+// Feature Modules - Safety & Incidents
+import { IncidentsModule } from '../modules/incidents/incidents.module';
+import { SafetyInspectionsModule } from '../modules/safety-inspections/safety-inspections.module';
+
+// Feature Modules - Digital Twin
+import { DigitalTwinModule } from '../modules/digital-twin/digital-twin.module';
+
+// Feature Modules - Integrations
+import { AcrelModule } from '../modules/acrel/acrel.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -53,24 +54,25 @@ import { AppService } from './app.service';
     // Database
     PrismaModule,
 
-    // Feature Modules
+    // Feature Modules - SCADA Core
     StationsModule,
     DevicesModule,
-    DataPointsModule,
+    MonitoringPointsModule,
     ReadingsModule,
-    ReadingsAggregatedModule,
-    AlarmsModule,
-    AlarmRulesModule,
-    AlarmEngineModule,
+    AlertsModule,
     CommandsModule,
-    ConnectionsModule,
-    EventLogsModule,
-    SettingsModule,
-    DataCollectorModule,
-    CommandExecutorModule,
-    ReportsModule,
+    EnergyModule,
     HealthModule,
-    WebsocketModule,
+
+    // Feature Modules - Safety & Incidents
+    IncidentsModule,
+    SafetyInspectionsModule,
+
+    // Feature Modules - Digital Twin
+    DigitalTwinModule,
+
+    // Feature Modules - Integrations
+    AcrelModule,
   ],
   controllers: [AppController],
   providers: [AppService],

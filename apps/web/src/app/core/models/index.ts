@@ -1,173 +1,128 @@
-// ==================== المحطات ====================
+// Station Model
 export interface Station {
   id: string;
   code: string;
   name: string;
   nameEn?: string;
-  type: StationType;
-  voltage: StationVoltage;
-  capacity?: number;
-  latitude?: number;
-  longitude?: number;
+  type: 'main' | 'substation' | 'distribution' | 'solar';
+  voltageLevel: string;
+  latitude?: string;
+  longitude?: string;
   address?: string;
-  commissionDate?: Date;
-  status: StationStatus;
-  lastSyncAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  capacity?: string;
+  status: 'online' | 'offline' | 'maintenance' | 'warning';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
   _count?: {
     devices: number;
-    alarms: number;
+    monitoringPoints: number;
+    alerts: number;
   };
 }
 
-export type StationType = 'main' | 'sub' | 'distribution' | 'solar';
-export type StationVoltage = '33kv' | '11kv' | '0.4kv';
-export type StationStatus = 'online' | 'offline' | 'maintenance';
-
-// ==================== الأجهزة ====================
+// Device Model
 export interface Device {
   id: string;
   stationId: string;
   code: string;
   name: string;
-  type: DeviceType;
+  nameEn?: string;
+  type: string;
   manufacturer?: string;
   model?: string;
-  serialNo?: string;
-  ratedCapacity?: number;
-  ratedVoltage?: number;
-  ratedCurrent?: number;
-  installDate?: Date;
-  status: DeviceStatus;
-  lastReadingAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  station?: { code: string; name: string };
+  serialNumber?: string;
+  status: 'active' | 'inactive' | 'maintenance' | 'fault';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  station?: Station;
   _count?: {
-    dataPoints: number;
-    readings: number;
-    alarms: number;
+    monitoringPoints: number;
   };
 }
 
-export type DeviceType = 'transformer' | 'breaker' | 'meter' | 'feeder' | 'panel';
-export type DeviceStatus = 'active' | 'faulty' | 'maintenance' | 'inactive';
-
-// ==================== نقاط القياس ====================
-export interface DataPoint {
+// Monitoring Point Model
+export interface MonitoringPoint {
   id: string;
   deviceId: string;
   code: string;
   name: string;
-  unit: string;
-  dataType: DataPointType;
+  nameEn?: string;
+  dataType: 'analog' | 'digital' | 'counter' | 'string';
+  unit?: string;
   minValue?: number;
   maxValue?: number;
-  warningLow?: number;
-  warningHigh?: number;
-  alarmLow?: number;
+  alarmHighHigh?: number;
   alarmHigh?: number;
-  scaleFactor?: number;
+  alarmLow?: number;
+  alarmLowLow?: number;
   modbusAddress?: number;
+  modbusRegisterType?: string;
+  scaleFactor?: number;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  device?: { code: string; name: string };
+  device?: Device;
 }
 
-export type DataPointType = 'analog' | 'digital' | 'counter';
-
-// ==================== القراءات ====================
-export interface Reading {
+// Alert Model
+export interface Alert {
   id: string;
-  deviceId: string;
-  dataPointId: string;
-  value: number;
-  quality: ReadingQuality;
-  timestamp: Date;
-  device?: { code: string; name: string };
-  dataPoint?: { code: string; name: string; unit: string };
-}
-
-export type ReadingQuality = 'good' | 'bad' | 'uncertain';
-
-export interface LiveReading {
-  dataPoint: DataPoint;
-  reading?: Reading;
-}
-
-// ==================== التنبيهات ====================
-export interface Alarm {
-  id: string;
-  alarmNo: string;
-  stationId: string;
+  stationId?: string;
   deviceId?: string;
-  dataPointId?: string;
-  severity: AlarmSeverity;
+  pointId?: string;
+  alertNumber: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  category: string;
   message: string;
   value?: number;
   threshold?: number;
-  status: AlarmStatus;
-  triggeredAt: Date;
+  status: 'active' | 'acknowledged' | 'cleared';
+  occurredAt: string;
+  acknowledgedAt?: string;
   acknowledgedBy?: string;
-  acknowledgedAt?: Date;
-  clearedAt?: Date;
-  notes?: string;
-  station?: { code: string; name: string };
-  device?: { code: string; name: string };
-  dataPoint?: { code: string; name: string; unit: string };
+  clearedAt?: string;
+  station?: Station;
+  device?: Device;
+  point?: MonitoringPoint;
 }
 
-export type AlarmSeverity = 'critical' | 'major' | 'minor' | 'warning';
-export type AlarmStatus = 'active' | 'acknowledged' | 'cleared';
-
-// ==================== أوامر التحكم ====================
-export interface Command {
+// Control Command Model
+export interface ControlCommand {
   id: string;
-  commandNo: string;
   deviceId: string;
-  commandType: CommandType;
+  commandType: string;
   targetValue?: string;
-  reason?: string;
-  status: CommandStatus;
+  status: 'pending' | 'approved' | 'rejected' | 'executing' | 'completed' | 'failed';
   requestedBy: string;
-  requestedAt: Date;
+  requestedAt: string;
   approvedBy?: string;
-  approvedAt?: Date;
-  executedAt?: Date;
-  response?: string;
-  device?: {
-    code: string;
-    name: string;
-    station?: { code: string; name: string };
-  };
+  approvedAt?: string;
+  executedAt?: string;
+  result?: string;
+  device?: Device;
 }
 
-export type CommandType = 'open' | 'close' | 'reset' | 'setpoint';
-export type CommandStatus = 'pending' | 'sent' | 'executed' | 'failed' | 'rejected';
-
-// ==================== الاستجابات ====================
-export interface PaginatedResponse<T> {
+// API Response Model
+export interface ApiResponse<T> {
   data: T[];
-  meta: {
+  meta?: {
     total: number;
     page: number;
     limit: number;
     totalPages: number;
   };
+  total?: number;
+  skip?: number;
+  take?: number;
 }
 
-export interface Statistics {
-  total: number;
-  byType?: Record<string, number>;
-  byStatus?: Record<string, number>;
-  bySeverity?: Record<string, number>;
-}
-
-// ==================== WebSocket ====================
-export interface WsMessage<T = any> {
-  type: string;
-  data: T;
-  timestamp: string;
+// Dashboard Stats
+export interface DashboardStats {
+  totalStations: number;
+  onlineStations: number;
+  totalDevices: number;
+  activeDevices: number;
+  activeAlerts: number;
+  criticalAlerts: number;
+  warningAlerts: number;
 }

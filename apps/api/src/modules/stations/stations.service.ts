@@ -1,52 +1,65 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateStationDto, UpdateStationDto, StationQueryDto } from './dto';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class StationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async create(createStationDto: CreateStationDto) {
-    // التحقق من عدم وجود محطة بنفس الرمز
-    const existingStation = await this.prisma.scadaStation.findUnique({
-      where: { code: createStationDto.code },
+  async create(dto: CreateStationDto) {
+    const existing = await this.prisma.scada_stations.findUnique({
+      where: { code: dto.code }
     });
-
-    if (existingStation) {
-      throw new ConflictException(`محطة بالرمز ${createStationDto.code} موجودة مسبقاً`);
+    
+    if (existing) {
+      throw new ConflictException(`محطة بالكود ${dto.code} موجودة مسبقاً`);
     }
 
-    return this.prisma.scadaStation.create({
+    return this.prisma.scada_stations.create({
       data: {
-        ...createStationDto,
-        capacity: createStationDto.capacity ? new Prisma.Decimal(createStationDto.capacity) : null,
-        latitude: createStationDto.latitude ? new Prisma.Decimal(createStationDto.latitude) : null,
-        longitude: createStationDto.longitude ? new Prisma.Decimal(createStationDto.longitude) : null,
-        commissionDate: createStationDto.commissionDate ? new Date(createStationDto.commissionDate) : null,
+        code: dto.code,
+        name: dto.name,
+        nameEn: dto.nameEn,
+        type: dto.type,
+        voltageLevel: dto.voltageLevel,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        address: dto.address,
+        capacity: dto.capacity,
+        businessId: dto.businessId,
       },
+      include: {
+        devices: true,
+        _count: {
+          select: {
+            devices: true,
+            monitoringPoints: true,
+            alerts: true
+          }
+        }
+      }
     });
   }
 
   async findAll(query: StationQueryDto) {
-    const { page = 1, limit = 10, type, status, voltage, search } = query;
+    const { type, status, isActive, search, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ScadaStationWhereInput = {};
-
+    const where: any = {};
+    
     if (type) where.type = type;
     if (status) where.status = status;
-    if (voltage) where.voltage = voltage;
+    if (isActive !== undefined) where.isActive = isActive;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { nameEn: { contains: search, mode: 'insensitive' } },
-        { code: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } }
       ];
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.scadaStation.findMany({
+      this.prisma.scada_stations.findMany({
         where,
         skip,
         take: limit,
@@ -55,12 +68,13 @@ export class StationsService {
           _count: {
             select: {
               devices: true,
-              alarms: { where: { status: 'active' } },
-            },
-          },
-        },
+              monitoringPoints: true,
+              alerts: { where: { status: 'active' } }
+            }
+          }
+        }
       }),
-      this.prisma.scadaStation.count({ where }),
+      this.prisma.scada_stations.count({ where })
     ]);
 
     return {
@@ -69,183 +83,131 @@ export class StationsService {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
-      },
+        totalPages: Math.ceil(total / limit)
+      }
     };
   }
 
   async findOne(id: string) {
-    const station = await this.prisma.scadaStation.findUnique({
+    const station = await this.prisma.scada_stations.findUnique({
       where: { id },
       include: {
         devices: {
           include: {
             _count: {
-              select: { dataPoints: true },
-            },
-          },
+              select: { monitoringPoints: true }
+            }
+          }
         },
-        connection: true,
+        monitoringPoints: {
+          take: 50,
+          orderBy: { createdAt: 'desc' }
+        },
+        alerts: {
+          where: { status: 'active' },
+          take: 10,
+          orderBy: { triggeredAt: 'desc' }
+        },
         _count: {
           select: {
-            alarms: { where: { status: 'active' } },
-          },
-        },
-      },
+            devices: true,
+            monitoringPoints: true,
+            alerts: true,
+            controlCommands: true
+          }
+        }
+      }
     });
 
     if (!station) {
-      throw new NotFoundException(`المحطة بالمعرف ${id} غير موجودة`);
+      throw new NotFoundException(`المحطة غير موجودة`);
     }
 
     return station;
   }
 
-  async update(id: string, updateStationDto: UpdateStationDto) {
-    await this.findOne(id);
-
-    // التحقق من عدم تكرار الرمز
-    if (updateStationDto.code) {
-      const existingStation = await this.prisma.scadaStation.findFirst({
-        where: {
-          code: updateStationDto.code,
-          NOT: { id },
-        },
-      });
-
-      if (existingStation) {
-        throw new ConflictException(`محطة بالرمز ${updateStationDto.code} موجودة مسبقاً`);
+  async findByCode(code: string) {
+    const station = await this.prisma.scada_stations.findUnique({
+      where: { code },
+      include: {
+        devices: true,
+        _count: {
+          select: {
+            devices: true,
+            monitoringPoints: true,
+            alerts: true
+          }
+        }
       }
+    });
+
+    if (!station) {
+      throw new NotFoundException(`المحطة بالكود ${code} غير موجودة`);
     }
 
-    return this.prisma.scadaStation.update({
+    return station;
+  }
+
+  async update(id: string, dto: UpdateStationDto) {
+    await this.findOne(id);
+
+    return this.prisma.scada_stations.update({
       where: { id },
       data: {
-        ...updateStationDto,
-        capacity: updateStationDto.capacity !== undefined
-          ? (updateStationDto.capacity ? new Prisma.Decimal(updateStationDto.capacity) : null)
-          : undefined,
-        latitude: updateStationDto.latitude !== undefined
-          ? (updateStationDto.latitude ? new Prisma.Decimal(updateStationDto.latitude) : null)
-          : undefined,
-        longitude: updateStationDto.longitude !== undefined
-          ? (updateStationDto.longitude ? new Prisma.Decimal(updateStationDto.longitude) : null)
-          : undefined,
-        commissionDate: updateStationDto.commissionDate
-          ? new Date(updateStationDto.commissionDate)
-          : undefined,
+        ...dto,
+        updatedAt: new Date()
       },
+      include: {
+        devices: true,
+        _count: {
+          select: {
+            devices: true,
+            monitoringPoints: true,
+            alerts: true
+          }
+        }
+      }
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.scadaStation.delete({ where: { id } });
-  }
-
-  async getDevices(id: string) {
-    await this.findOne(id);
-    return this.prisma.scadaDevice.findMany({
-      where: { stationId: id },
-      include: {
-        _count: {
-          select: { dataPoints: true, readings: true },
-        },
-      },
-    });
-  }
-
-  async getReadings(id: string, startDate?: Date, endDate?: Date) {
-    await this.findOne(id);
     
-    const devices = await this.prisma.scadaDevice.findMany({
-      where: { stationId: id },
-      select: { id: true },
-    });
-
-    const deviceIds = devices.map(d => d.id);
-
-    return this.prisma.scadaReading.findMany({
-      where: {
-        deviceId: { in: deviceIds },
-        ...(startDate && endDate && {
-          timestamp: {
-            gte: startDate,
-            lte: endDate,
-          },
-        }),
-      },
-      orderBy: { timestamp: 'desc' },
-      take: 1000,
-      include: {
-        device: { select: { code: true, name: true } },
-        dataPoint: { select: { code: true, name: true, unit: true } },
-      },
+    return this.prisma.scada_stations.delete({
+      where: { id }
     });
   }
 
-  async getAlarms(id: string, status?: string) {
-    await this.findOne(id);
-    return this.prisma.scadaAlarm.findMany({
-      where: {
-        stationId: id,
-        ...(status && { status }),
-      },
-      orderBy: { triggeredAt: 'desc' },
-      include: {
-        device: { select: { code: true, name: true } },
-        dataPoint: { select: { code: true, name: true, unit: true } },
-      },
-    });
-  }
-
-  async getMapData() {
-    return this.prisma.scadaStation.findMany({
-      where: {
-        latitude: { not: null },
-        longitude: { not: null },
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        type: true,
-        voltage: true,
-        status: true,
-        latitude: true,
-        longitude: true,
-        _count: {
-          select: {
-            devices: true,
-            alarms: { where: { status: 'active' } },
-          },
-        },
-      },
-    });
-  }
-
-  async getStatistics() {
-    const [total, byType, byStatus, byVoltage] = await Promise.all([
-      this.prisma.scadaStation.count(),
-      this.prisma.scadaStation.groupBy({
+  async getStats() {
+    const [total, online, offline, maintenance, byType] = await Promise.all([
+      this.prisma.scada_stations.count(),
+      this.prisma.scada_stations.count({ where: { status: 'online' } }),
+      this.prisma.scada_stations.count({ where: { status: 'offline' } }),
+      this.prisma.scada_stations.count({ where: { status: 'maintenance' } }),
+      this.prisma.scada_stations.groupBy({
         by: ['type'],
-        _count: true,
-      }),
-      this.prisma.scadaStation.groupBy({
-        by: ['status'],
-        _count: true,
-      }),
-      this.prisma.scadaStation.groupBy({
-        by: ['voltage'],
-        _count: true,
-      }),
+        _count: { id: true }
+      })
     ]);
 
     return {
       total,
-      byType: byType.reduce((acc, item) => ({ ...acc, [item.type]: item._count }), {}),
-      byStatus: byStatus.reduce((acc, item) => ({ ...acc, [item.status]: item._count }), {}),
-      byVoltage: byVoltage.reduce((acc, item) => ({ ...acc, [item.voltage]: item._count }), {}),
+      online,
+      offline,
+      maintenance,
+      byType: byType.map(t => ({ type: t.type, count: t._count.id }))
     };
+  }
+
+  async updateStatus(id: string, status: string) {
+    await this.findOne(id);
+    
+    return this.prisma.scada_stations.update({
+      where: { id },
+      data: { 
+        status,
+        lastSyncAt: new Date()
+      }
+    });
   }
 }

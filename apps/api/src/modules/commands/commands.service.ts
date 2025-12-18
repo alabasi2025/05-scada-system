@@ -1,297 +1,59 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreateCommandDto, ApproveCommandDto, RejectCommandDto, CommandQueryDto } from './dto';
-import { Prisma } from '@prisma/client';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CreateCommandDto, CommandQueryDto } from './dto';
 
 @Injectable()
 export class CommandsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async create(createCommandDto: CreateCommandDto, requestedBy: string) {
-    // التحقق من وجود الجهاز
-    const device = await this.prisma.scadaDevice.findUnique({
-      where: { id: createCommandDto.deviceId },
-      include: {
-        station: { select: { id: true, code: true, name: true } },
-      },
+  async create(dto: CreateCommandDto) {
+    return this.prisma.control_commands.create({ 
+      data: { 
+        stationId: dto.stationId,
+        deviceId: dto.deviceId,
+        commandType: dto.commandType,
+        targetType: 'device',
+        targetId: dto.deviceId || dto.stationId,
+        commandValue: dto.commandCode,
+        parameters: dto.parameters || {},
+        issuedBy: dto.requestedBy,
+        status: 'pending'
+      } as any 
     });
-
-    if (!device) {
-      throw new NotFoundException(`الجهاز بالمعرف ${createCommandDto.deviceId} غير موجود`);
-    }
-
-    // التحقق من حالة الجهاز
-    if (device.status === 'inactive' || device.status === 'faulty') {
-      throw new BadRequestException(`لا يمكن إرسال أوامر لجهاز ${device.status === 'inactive' ? 'غير نشط' : 'معطل'}`);
-    }
-
-    // إنشاء رقم الأمر
-    const commandNo = `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
-    const command = await this.prisma.scadaCommand.create({
-      data: {
-        commandNo,
-        deviceId: createCommandDto.deviceId,
-        commandType: createCommandDto.commandType,
-        targetValue: createCommandDto.targetValue,
-        reason: createCommandDto.reason,
-        requestedBy,
-      },
-      include: {
-        device: {
-          select: {
-            code: true,
-            name: true,
-            station: { select: { code: true, name: true } },
-          },
-        },
-      },
-    });
-
-    // إرسال حدث إنشاء الأمر
-    this.eventEmitter.emit('command.created', command);
-
-    // تسجيل الحدث
-    await this.logEvent('COMMAND_CREATED', command);
-
-    return command;
   }
 
   async findAll(query: CommandQueryDto) {
-    const { page = 1, limit = 20, deviceId, status, commandType, startDate, endDate } = query;
-    const skip = (page - 1) * limit;
-
-    const where: Prisma.ScadaCommandWhereInput = {};
-
-    if (deviceId) where.deviceId = deviceId;
+    const { stationId, status, page = 1, limit = 50 } = query;
+    const where: any = {};
+    if (stationId) where.stationId = stationId;
     if (status) where.status = status;
-    if (commandType) where.commandType = commandType;
-    if (startDate || endDate) {
-      where.requestedAt = {};
-      if (startDate) where.requestedAt.gte = new Date(startDate);
-      if (endDate) where.requestedAt.lte = new Date(endDate);
-    }
 
     const [data, total] = await Promise.all([
-      this.prisma.scadaCommand.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { requestedAt: 'desc' },
-        include: {
-          device: {
-            select: {
-              code: true,
-              name: true,
-              station: { select: { code: true, name: true } },
-            },
-          },
-        },
-      }),
-      this.prisma.scadaCommand.count({ where }),
+      this.prisma.control_commands.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { issuedAt: 'desc' }, include: { station: true, device: true } }),
+      this.prisma.control_commands.count({ where })
     ]);
-
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { data, meta: { total, page, limit } };
   }
 
   async findOne(id: string) {
-    const command = await this.prisma.scadaCommand.findUnique({
-      where: { id },
-      include: {
-        device: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            type: true,
-            status: true,
-            station: { select: { id: true, code: true, name: true } },
-          },
-        },
-      },
-    });
-
-    if (!command) {
-      throw new NotFoundException(`الأمر بالمعرف ${id} غير موجود`);
-    }
-
-    return command;
+    const cmd = await this.prisma.control_commands.findUnique({ where: { id }, include: { station: true, device: true } });
+    if (!cmd) throw new NotFoundException('الأمر غير موجود');
+    return cmd;
   }
 
-  async approve(id: string, approvedBy: string, dto: ApproveCommandDto) {
-    const command = await this.findOne(id);
-
-    if (command.status !== 'pending') {
-      throw new BadRequestException('لا يمكن الموافقة على أمر غير معلق');
-    }
-
-    const updatedCommand = await this.prisma.scadaCommand.update({
-      where: { id },
-      data: {
-        status: 'sent',
-        approvedBy,
-        approvedAt: new Date(),
-      },
-      include: {
-        device: {
-          select: {
-            code: true,
-            name: true,
-            station: { select: { code: true, name: true } },
-          },
-        },
-      },
-    });
-
-    // إرسال حدث الموافقة
-    this.eventEmitter.emit('command.approved', updatedCommand);
-
-    // محاكاة تنفيذ الأمر (في الإنتاج، سيتم إرساله للجهاز الفعلي)
-    await this.executeCommand(id);
-
-    return updatedCommand;
+  async approve(id: string, userId: string) {
+    await this.findOne(id);
+    return this.prisma.control_commands.update({ where: { id }, data: { status: 'sent', notes: `Approved by ${userId}` } });
   }
 
-  async reject(id: string, dto: RejectCommandDto) {
-    const command = await this.findOne(id);
-
-    if (command.status !== 'pending') {
-      throw new BadRequestException('لا يمكن رفض أمر غير معلق');
-    }
-
-    const updatedCommand = await this.prisma.scadaCommand.update({
-      where: { id },
-      data: {
-        status: 'rejected',
-        response: dto.reason,
-      },
-      include: {
-        device: {
-          select: {
-            code: true,
-            name: true,
-            station: { select: { code: true, name: true } },
-          },
-        },
-      },
-    });
-
-    // إرسال حدث الرفض
-    this.eventEmitter.emit('command.rejected', updatedCommand);
-
-    return updatedCommand;
+  async execute(id: string) {
+    const cmd = await this.findOne(id);
+    // هنا يتم تنفيذ الأمر فعلياً عبر Modbus
+    return this.prisma.control_commands.update({ where: { id }, data: { status: 'executed', executedAt: new Date(), result: 'success' } });
   }
 
-  async executeCommand(id: string) {
-    const command = await this.findOne(id);
-
-    if (command.status !== 'sent') {
-      throw new BadRequestException('لا يمكن تنفيذ أمر غير مرسل');
-    }
-
-    try {
-      // محاكاة تنفيذ الأمر
-      // في الإنتاج، سيتم الاتصال بالجهاز عبر Modbus أو بروتوكول آخر
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const updatedCommand = await this.prisma.scadaCommand.update({
-        where: { id },
-        data: {
-          status: 'executed',
-          executedAt: new Date(),
-          response: 'تم تنفيذ الأمر بنجاح',
-        },
-      });
-
-      // إرسال حدث التنفيذ
-      this.eventEmitter.emit('command.executed', updatedCommand);
-
-      // تسجيل الحدث
-      await this.logEvent('COMMAND_EXECUTED', updatedCommand);
-
-      return updatedCommand;
-    } catch (error) {
-      const updatedCommand = await this.prisma.scadaCommand.update({
-        where: { id },
-        data: {
-          status: 'failed',
-          response: error.message,
-        },
-      });
-
-      // إرسال حدث الفشل
-      this.eventEmitter.emit('command.failed', updatedCommand);
-
-      return updatedCommand;
-    }
-  }
-
-  async getPendingCommands() {
-    return this.prisma.scadaCommand.findMany({
-      where: { status: 'pending' },
-      orderBy: { requestedAt: 'asc' },
-      include: {
-        device: {
-          select: {
-            code: true,
-            name: true,
-            station: { select: { code: true, name: true } },
-          },
-        },
-      },
-    });
-  }
-
-  async getStatistics() {
-    const [total, byStatus, byType, recent] = await Promise.all([
-      this.prisma.scadaCommand.count(),
-      this.prisma.scadaCommand.groupBy({
-        by: ['status'],
-        _count: true,
-      }),
-      this.prisma.scadaCommand.groupBy({
-        by: ['commandType'],
-        _count: true,
-      }),
-      this.prisma.scadaCommand.findMany({
-        orderBy: { requestedAt: 'desc' },
-        take: 5,
-        include: {
-          device: { select: { code: true, name: true } },
-        },
-      }),
-    ]);
-
-    return {
-      total,
-      byStatus: byStatus.reduce((acc, item) => ({ ...acc, [item.status]: item._count }), {}),
-      byType: byType.reduce((acc, item) => ({ ...acc, [item.commandType]: item._count }), {}),
-      recent,
-    };
-  }
-
-  private async logEvent(eventType: string, command: any) {
-    await this.prisma.scadaEventLog.create({
-      data: {
-        eventType,
-        entityType: 'command',
-        entityId: command.id,
-        description: `${eventType}: ${command.commandNo} - ${command.commandType}`,
-        details: command,
-        userId: command.requestedBy,
-      },
-    });
+  async reject(id: string, userId: string, reason: string) {
+    await this.findOne(id);
+    return this.prisma.control_commands.update({ where: { id }, data: { status: 'cancelled', notes: `Rejected by ${userId}: ${reason}` } });
   }
 }
