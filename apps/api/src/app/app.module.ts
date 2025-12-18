@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 // Common Modules
@@ -48,6 +49,12 @@ import { AppService } from './app.service';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Rate Limiting - حد أقصى 100 طلب كل 60 ثانية
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
 
     // Scheduler for cron jobs
     ScheduleModule.forRoot(),
@@ -96,6 +103,11 @@ import { AppService } from './app.service';
   controllers: [AppController],
   providers: [
     AppService,
+    // Global Guards - Rate Limiting
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     // Global Guards - RBAC
     {
       provide: APP_GUARD,
