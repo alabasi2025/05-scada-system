@@ -781,18 +781,21 @@ export class AdvancedDashboardComponent implements OnInit, OnDestroy, AfterViewI
   }
 
   loadStats(): void {
-    this.http.get<any>(`${environment.apiUrl}/stations`).subscribe(stations => {
+    this.http.get<any>(`${environment.apiUrl}/stations`).subscribe((response: any) => {
+      const stations = response.data || response;
       this.stats.totalStations = stations.length;
       this.stats.onlineStations = stations.filter((s: any) => s.status === 'online').length;
       this.stats.offlineStations = stations.filter((s: any) => s.status !== 'online').length;
     });
 
-    this.http.get<any>(`${environment.apiUrl}/devices`).subscribe(devices => {
+    this.http.get<any>(`${environment.apiUrl}/devices`).subscribe((response: any) => {
+      const devices = response.data || response;
       this.stats.totalDevices = devices.length;
       this.stats.activeDevices = devices.filter((d: any) => d.status === 'active').length;
     });
 
-    this.http.get<any>(`${environment.apiUrl}/alarms?status=active`).subscribe(alarms => {
+    this.http.get<any>(`${environment.apiUrl}/alarms?status=active`).subscribe((response: any) => {
+      const alarms = response.data || response;
       this.stats.totalAlarms = alarms.length;
       this.stats.criticalAlarms = alarms.filter((a: any) => a.severity === 'critical').length;
       this.stats.warningAlarms = alarms.filter((a: any) => a.severity === 'warning').length;
@@ -801,7 +804,8 @@ export class AdvancedDashboardComponent implements OnInit, OnDestroy, AfterViewI
   }
 
   loadStations(): void {
-    this.http.get<any>(`${environment.apiUrl}/stations`).subscribe(stations => {
+    this.http.get<any>(`${environment.apiUrl}/stations`).subscribe((response: any) => {
+      const stations = response.data || response;
       this.stations = stations.map((s: any) => ({
         id: s.id,
         code: s.code,
@@ -824,7 +828,8 @@ export class AdvancedDashboardComponent implements OnInit, OnDestroy, AfterViewI
   }
 
   loadRecentAlarms(): void {
-    this.http.get<any>(`${environment.apiUrl}/alarms?limit=10`).subscribe(alarms => {
+    this.http.get<any>(`${environment.apiUrl}/alarms?limit=10`).subscribe((response: any) => {
+      const alarms = response.data || response;
       this.recentAlarms = alarms.map((a: any) => ({
         ...a,
         stationCode: a.station?.code || a.device?.station?.code || '-'

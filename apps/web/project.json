@@ -54,6 +54,9 @@
     "serve": {
       "continuous": true,
       "executor": "@angular/build:dev-server",
+      "options": {
+        "allowedHosts": ["all", "4200-i42d90on3akw5s88ha131-182bb932.manusvm.computer", ".manusvm.computer"]
+      },
       "configurations": {
         "production": {
           "buildTarget": "web:build:production"
