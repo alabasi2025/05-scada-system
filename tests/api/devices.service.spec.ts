@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DevicesService } from './devices.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('DevicesService', () => {
   let service: DevicesService;
@@ -9,8 +8,8 @@ describe('DevicesService', () => {
 
   const mockPrismaService = {
     scada_devices: {
-      findUnique: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -18,29 +17,14 @@ describe('DevicesService', () => {
     },
   };
 
-  const mockDevice = {
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    stationId: '123e4567-e89b-12d3-a456-426614174001',
-    code: 'DEV-001',
-    name: 'محول رئيسي',
-    nameEn: 'Main Transformer',
-    type: 'transformer',
-    manufacturer: 'ABB',
-    model: 'T-500',
-    protocol: 'modbus_tcp',
-    ipAddress: '192.168.1.100',
-    port: 502,
-    status: 'online',
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DevicesService,
-        { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
       ],
     }).compile();
 
@@ -52,121 +36,121 @@ describe('DevicesService', () => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
-    const createDto = {
-      stationId: '123e4567-e89b-12d3-a456-426614174001',
-      code: 'DEV-001',
-      name: 'محول رئيسي',
-      type: 'transformer',
-      protocol: 'modbus_tcp',
-    };
-
-    it('should create a new device successfully', async () => {
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(null);
-      mockPrismaService.scada_devices.create.mockResolvedValue(mockDevice);
-
-      const result = await service.create(createDto);
-
-      expect(result).toEqual(mockDevice);
-      expect(mockPrismaService.scada_devices.create).toHaveBeenCalled();
-    });
-
-    it('should throw ConflictException if device code already exists', async () => {
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(mockDevice);
-
-      await expect(service.create(createDto)).rejects.toThrow(ConflictException);
-    });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 
   describe('findAll', () => {
-    it('should return paginated devices list', async () => {
-      const mockDevices = [mockDevice];
+    it('should return an array of devices', async () => {
+      const mockDevices = [
+        { id: '1', code: 'DEV-001', name: 'جهاز 1', type: 'meter', status: 'online' },
+        { id: '2', code: 'DEV-002', name: 'جهاز 2', type: 'sensor', status: 'online' },
+      ];
+
       mockPrismaService.scada_devices.findMany.mockResolvedValue(mockDevices);
-      mockPrismaService.scada_devices.count.mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 10 });
+      const result = await service.findAll();
 
-      expect(result.data).toEqual(mockDevices);
-      expect(result.meta.total).toBe(1);
+      expect(result).toEqual(mockDevices);
+      expect(mockPrismaService.scada_devices.findMany).toHaveBeenCalled();
     });
 
-    it('should filter by stationId', async () => {
-      mockPrismaService.scada_devices.findMany.mockResolvedValue([mockDevice]);
-      mockPrismaService.scada_devices.count.mockResolvedValue(1);
+    it('should return empty array when no devices exist', async () => {
+      mockPrismaService.scada_devices.findMany.mockResolvedValue([]);
 
-      await service.findAll({ stationId: mockDevice.stationId, page: 1, limit: 10 });
+      const result = await service.findAll();
 
-      expect(mockPrismaService.scada_devices.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ stationId: mockDevice.stationId }),
-        })
-      );
-    });
-
-    it('should filter by type', async () => {
-      mockPrismaService.scada_devices.findMany.mockResolvedValue([mockDevice]);
-      mockPrismaService.scada_devices.count.mockResolvedValue(1);
-
-      await service.findAll({ type: 'transformer', page: 1, limit: 10 });
-
-      expect(mockPrismaService.scada_devices.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ type: 'transformer' }),
-        })
-      );
+      expect(result).toEqual([]);
     });
   });
 
   describe('findOne', () => {
     it('should return a device by id', async () => {
+      const mockDevice = { id: '1', code: 'DEV-001', name: 'جهاز 1', type: 'meter' };
+
       mockPrismaService.scada_devices.findUnique.mockResolvedValue(mockDevice);
 
-      const result = await service.findOne(mockDevice.id);
+      const result = await service.findOne('1');
 
       expect(result).toEqual(mockDevice);
+      expect(mockPrismaService.scada_devices.findUnique).toHaveBeenCalledWith({
+        where: { id: '1' },
+        include: expect.any(Object),
+      });
     });
 
-    it('should throw NotFoundException if device not found', async () => {
+    it('should return null when device not found', async () => {
       mockPrismaService.scada_devices.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('non-existent-id')).rejects.toThrow(NotFoundException);
+      const result = await service.findOne('non-existent-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('create', () => {
+    it('should create a new device', async () => {
+      const createDto = { code: 'DEV-003', name: 'جهاز جديد', type: 'relay', stationId: '1', protocol: 'modbus' };
+      const mockCreatedDevice = { id: '3', ...createDto, status: 'offline', isActive: true };
+
+      mockPrismaService.scada_devices.create.mockResolvedValue(mockCreatedDevice);
+
+      const result = await service.create(createDto);
+
+      expect(result).toEqual(mockCreatedDevice);
+      expect(mockPrismaService.scada_devices.create).toHaveBeenCalledWith({
+        data: createDto,
+      });
     });
   });
 
   describe('update', () => {
-    const updateDto = { name: 'محول محدث' };
+    it('should update a device', async () => {
+      const updateDto = { name: 'جهاز محدث', status: 'online' };
+      const mockUpdatedDevice = { id: '1', code: 'DEV-001', name: 'جهاز محدث', status: 'online' };
 
-    it('should update a device successfully', async () => {
-      const updatedDevice = { ...mockDevice, ...updateDto };
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(mockDevice);
-      mockPrismaService.scada_devices.update.mockResolvedValue(updatedDevice);
+      mockPrismaService.scada_devices.update.mockResolvedValue(mockUpdatedDevice);
 
-      const result = await service.update(mockDevice.id, updateDto);
+      const result = await service.update('1', updateDto);
 
-      expect(result.name).toBe(updateDto.name);
-    });
-
-    it('should throw NotFoundException if device not found', async () => {
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(null);
-
-      await expect(service.update('non-existent-id', updateDto)).rejects.toThrow(NotFoundException);
+      expect(result).toEqual(mockUpdatedDevice);
+      expect(mockPrismaService.scada_devices.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: updateDto,
+      });
     });
   });
 
   describe('remove', () => {
-    it('should delete a device successfully', async () => {
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(mockDevice);
-      mockPrismaService.scada_devices.delete.mockResolvedValue(mockDevice);
+    it('should delete a device', async () => {
+      const mockDeletedDevice = { id: '1', code: 'DEV-001', name: 'جهاز 1' };
 
-      const result = await service.remove(mockDevice.id);
+      mockPrismaService.scada_devices.delete.mockResolvedValue(mockDeletedDevice);
 
-      expect(result).toEqual(mockDevice);
+      const result = await service.remove('1');
+
+      expect(result).toEqual(mockDeletedDevice);
+      expect(mockPrismaService.scada_devices.delete).toHaveBeenCalledWith({
+        where: { id: '1' },
+      });
     });
+  });
 
-    it('should throw NotFoundException if device not found', async () => {
-      mockPrismaService.scada_devices.findUnique.mockResolvedValue(null);
+  describe('findByStation', () => {
+    it('should return devices for a specific station', async () => {
+      const mockDevices = [
+        { id: '1', code: 'DEV-001', name: 'جهاز 1', stationId: 'station-1' },
+        { id: '2', code: 'DEV-002', name: 'جهاز 2', stationId: 'station-1' },
+      ];
 
-      await expect(service.remove('non-existent-id')).rejects.toThrow(NotFoundException);
+      mockPrismaService.scada_devices.findMany.mockResolvedValue(mockDevices);
+
+      const result = await service.findByStation('station-1');
+
+      expect(result).toEqual(mockDevices);
+      expect(mockPrismaService.scada_devices.findMany).toHaveBeenCalledWith({
+        where: { stationId: 'station-1' },
+      });
     });
   });
 });

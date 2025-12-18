@@ -2,9 +2,17 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { APP_GUARD } from '@nestjs/core';
 
 // Common Modules
 import { PrismaModule } from '../common/prisma/prisma.module';
+
+// Guards
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+
+// Auth Module
+import { AuthModule } from '../modules/auth/auth.module';
 
 // Feature Modules - SCADA Core
 import { StationsModule } from '../modules/stations/stations.module';
@@ -58,6 +66,9 @@ import { AppService } from './app.service';
     // Database
     PrismaModule,
 
+    // Auth Module
+    AuthModule,
+
     // Feature Modules - SCADA Core
     StationsModule,
     DevicesModule,
@@ -83,6 +94,17 @@ import { AppService } from './app.service';
     AcrelModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global Guards - RBAC
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}
