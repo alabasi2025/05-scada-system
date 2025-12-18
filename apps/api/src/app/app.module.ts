@@ -20,6 +20,10 @@ import { HealthModule } from '../modules/health/health.module';
 import { IncidentsModule } from '../modules/incidents/incidents.module';
 import { SafetyInspectionsModule } from '../modules/safety-inspections/safety-inspections.module';
 
+// Feature Modules - Quality & Safety
+import { QualityModule } from '../modules/quality/quality.module';
+import { SecurityModule } from '../modules/security/security.module';
+
 // Feature Modules - Digital Twin
 import { DigitalTwinModule } from '../modules/digital-twin/digital-twin.module';
 
@@ -67,6 +71,10 @@ import { AppService } from './app.service';
     // Feature Modules - Safety & Incidents
     IncidentsModule,
     SafetyInspectionsModule,
+
+    // Feature Modules - Quality & Safety
+    QualityModule,
+    SecurityModule,
 
     // Feature Modules - Digital Twin
     DigitalTwinModule,
