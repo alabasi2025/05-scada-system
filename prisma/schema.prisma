@@ -168,10 +168,10 @@ model ScadaAlarmRule {
 // ==================== التنبيهات ====================
 model ScadaAlarm {
   id             String    @id @default(uuid()) @db.Uuid
-  alarmNo        String    @unique @map("alarm_no") @db.VarChar(50)
-  ruleId         String?   @map("rule_id") @db.Uuid
-  stationId      String    @map("station_id") @db.Uuid
-  deviceId       String?   @map("device_id") @db.Uuid
+  alarmNo        String?   @unique @map("alarm_no") @db.VarChar(50)
+  alarmRuleId    String?   @map("alarm_rule_id") @db.Uuid
+  stationId      String?   @map("station_id") @db.Uuid
+  deviceId       String    @map("device_id") @db.Uuid
   dataPointId    String?   @map("data_point_id") @db.Uuid
   severity       String    @db.VarChar(20) // critical, major, minor, warning
   message        String    @db.Text
@@ -184,9 +184,9 @@ model ScadaAlarm {
   clearedAt      DateTime? @map("cleared_at")
   notes          String?   @db.Text
 
-  station   ScadaStation    @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  rule      ScadaAlarmRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
-  device    ScadaDevice?    @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  station   ScadaStation?   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  rule      ScadaAlarmRule? @relation(fields: [alarmRuleId], references: [id], onDelete: SetNull)
+  device    ScadaDevice     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   dataPoint ScadaDataPoint? @relation(fields: [dataPointId], references: [id], onDelete: SetNull)
 
   @@index([stationId, status])
@@ -270,4 +270,23 @@ model ScadaSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("scada_settings")
+}
+
+// ==================== الإشعارات ====================
+model ScadaNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  alarmId   String?   @map("alarm_id") @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  type      String    @db.VarChar(30) // alarm, info, warning, error, success
+  severity  String    @db.VarChar(20) // critical, major, minor, warning
+  title     String    @db.VarChar(200)
+  message   String    @db.Text
+  metadata  Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  sentAt    DateTime  @default(now()) @map("sent_at")
+
+  @@index([userId, isRead])
+  @@index([sentAt])
+  @@map("scada_notifications")
 }

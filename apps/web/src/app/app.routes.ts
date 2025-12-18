@@ -13,7 +13,15 @@ export const appRoutes: Route[] = [
       },
       {
         path: 'dashboard',
-        loadComponent: () => import('./features/dashboard/dashboard').then(m => m.DashboardComponent)
+        loadComponent: () => import('./features/dashboard/advanced-dashboard').then(m => m.AdvancedDashboardComponent)
+      },
+      {
+        path: 'map',
+        loadComponent: () => import('./features/map/stations-map').then(m => m.StationsMapComponent)
+      },
+      {
+        path: 'charts',
+        loadComponent: () => import('./features/charts/live-charts').then(m => m.LiveChartsComponent)
       },
       {
         path: 'stations',
