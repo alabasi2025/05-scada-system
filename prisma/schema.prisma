@@ -1,14 +1,273 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma Schema for SCADA System
+// نظام المراقبة والتحكم (05)
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==================== المحطات الكهربائية ====================
+model ScadaStation {
+  id             String    @id @default(uuid()) @db.Uuid
+  code           String    @unique @db.VarChar(50)
+  name           String    @db.VarChar(200)
+  nameEn         String?   @map("name_en") @db.VarChar(200)
+  type           String    @db.VarChar(50) // main, sub, distribution, solar
+  voltage        String    @db.VarChar(20) // 33kv, 11kv, 0.4kv
+  capacity       Decimal?  @db.Decimal(10, 2) // MVA
+  latitude       Decimal?  @db.Decimal(10, 8)
+  longitude      Decimal?  @db.Decimal(11, 8)
+  address        String?   @db.Text
+  commissionDate DateTime? @map("commission_date")
+  status         String    @default("online") @db.VarChar(20) // online, offline, maintenance
+  lastSyncAt     DateTime? @map("last_sync_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  devices    ScadaDevice[]
+  alarms     ScadaAlarm[]
+  connection ScadaConnection?
+
+  @@map("scada_stations")
+}
+
+// ==================== الأجهزة والمعدات ====================
+model ScadaDevice {
+  id            String    @id @default(uuid()) @db.Uuid
+  stationId     String    @map("station_id") @db.Uuid
+  code          String    @unique @db.VarChar(50)
+  name          String    @db.VarChar(200)
+  type          String    @db.VarChar(50) // transformer, breaker, meter, feeder, panel
+  manufacturer  String?   @db.VarChar(100)
+  model         String?   @db.VarChar(100)
+  serialNo      String?   @map("serial_no") @db.VarChar(100)
+  ratedCapacity Decimal?  @map("rated_capacity") @db.Decimal(10, 2)
+  ratedVoltage  Decimal?  @map("rated_voltage") @db.Decimal(10, 2)
+  ratedCurrent  Decimal?  @map("rated_current") @db.Decimal(10, 2)
+  installDate   DateTime? @map("install_date")
+  status        String    @default("active") @db.VarChar(20) // active, faulty, maintenance, inactive
+  lastReadingAt DateTime? @map("last_reading_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  station    ScadaStation     @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  dataPoints ScadaDataPoint[]
+  readings   ScadaReading[]
+  commands   ScadaCommand[]
+  alarms     ScadaAlarm[]
+
+  @@index([stationId])
+  @@map("scada_devices")
+}
+
+// ==================== نقاط القياس ====================
+model ScadaDataPoint {
+  id            String   @id @default(uuid()) @db.Uuid
+  deviceId      String   @map("device_id") @db.Uuid
+  code          String   @db.VarChar(50) // V_A, V_B, V_C, I_A, P_TOTAL, etc.
+  name          String   @db.VarChar(200)
+  unit          String   @db.VarChar(20) // V, A, kW, kWh, Hz, PF
+  dataType      String   @map("data_type") @db.VarChar(20) // analog, digital, counter
+  minValue      Decimal? @map("min_value") @db.Decimal(15, 4)
+  maxValue      Decimal? @map("max_value") @db.Decimal(15, 4)
+  warningLow    Decimal? @map("warning_low") @db.Decimal(15, 4)
+  warningHigh   Decimal? @map("warning_high") @db.Decimal(15, 4)
+  alarmLow      Decimal? @map("alarm_low") @db.Decimal(15, 4)
+  alarmHigh     Decimal? @map("alarm_high") @db.Decimal(15, 4)
+  scaleFactor   Decimal  @default(1) @map("scale_factor") @db.Decimal(10, 6)
+  modbusAddress Int?     @map("modbus_address")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  device   ScadaDevice    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  readings ScadaReading[]
+  alarms   ScadaAlarm[]
+
+  @@unique([deviceId, code])
+  @@index([deviceId])
+  @@map("scada_data_points")
+}
+
+// ==================== القراءات ====================
+model ScadaReading {
+  id          String   @id @default(uuid()) @db.Uuid
+  deviceId    String   @map("device_id") @db.Uuid
+  dataPointId String   @map("data_point_id") @db.Uuid
+  value       Decimal  @db.Decimal(15, 4)
+  quality     String   @default("good") @db.VarChar(20) // good, bad, uncertain
+  timestamp   DateTime @default(now())
+
+  device    ScadaDevice    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  dataPoint ScadaDataPoint @relation(fields: [dataPointId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, timestamp])
+  @@index([dataPointId, timestamp])
+  @@map("scada_readings")
+}
+
+// ==================== القراءات المجمعة (للتقارير) ====================
+model ScadaReadingHourly {
+  id           String   @id @default(uuid()) @db.Uuid
+  deviceId     String   @map("device_id") @db.Uuid
+  dataPointId  String   @map("data_point_id") @db.Uuid
+  hour         DateTime // بداية الساعة
+  minValue     Decimal  @map("min_value") @db.Decimal(15, 4)
+  maxValue     Decimal  @map("max_value") @db.Decimal(15, 4)
+  avgValue     Decimal  @map("avg_value") @db.Decimal(15, 4)
+  sumValue     Decimal? @map("sum_value") @db.Decimal(15, 4)
+  readingCount Int      @map("reading_count")
+
+  @@unique([dataPointId, hour])
+  @@index([deviceId, hour])
+  @@map("scada_readings_hourly")
+}
+
+// ==================== القراءات اليومية ====================
+model ScadaReadingDaily {
+  id           String   @id @default(uuid()) @db.Uuid
+  deviceId     String   @map("device_id") @db.Uuid
+  dataPointId  String   @map("data_point_id") @db.Uuid
+  date         DateTime @db.Date
+  minValue     Decimal  @map("min_value") @db.Decimal(15, 4)
+  maxValue     Decimal  @map("max_value") @db.Decimal(15, 4)
+  avgValue     Decimal  @map("avg_value") @db.Decimal(15, 4)
+  sumValue     Decimal? @map("sum_value") @db.Decimal(15, 4)
+  readingCount Int      @map("reading_count")
+
+  @@unique([dataPointId, date])
+  @@index([deviceId, date])
+  @@map("scada_readings_daily")
+}
+
+// ==================== قواعد التنبيه ====================
+model ScadaAlarmRule {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  dataPointId String?  @map("data_point_id") @db.Uuid
+  deviceId    String?  @map("device_id") @db.Uuid
+  stationId   String?  @map("station_id") @db.Uuid
+  condition   String   @db.VarChar(20) // gt, lt, eq, ne, between, outside
+  threshold1  Decimal  @db.Decimal(15, 4)
+  threshold2  Decimal? @db.Decimal(15, 4)
+  severity    String   @db.VarChar(20) // critical, major, minor, warning
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  alarms ScadaAlarm[]
+
+  @@map("scada_alarm_rules")
+}
+
+// ==================== التنبيهات ====================
+model ScadaAlarm {
+  id             String    @id @default(uuid()) @db.Uuid
+  alarmNo        String    @unique @map("alarm_no") @db.VarChar(50)
+  ruleId         String?   @map("rule_id") @db.Uuid
+  stationId      String    @map("station_id") @db.Uuid
+  deviceId       String?   @map("device_id") @db.Uuid
+  dataPointId    String?   @map("data_point_id") @db.Uuid
+  severity       String    @db.VarChar(20) // critical, major, minor, warning
+  message        String    @db.Text
+  value          Decimal?  @db.Decimal(15, 4)
+  threshold      Decimal?  @db.Decimal(15, 4)
+  status         String    @default("active") @db.VarChar(20) // active, acknowledged, cleared
+  triggeredAt    DateTime  @default(now()) @map("triggered_at")
+  acknowledgedBy String?   @map("acknowledged_by") @db.Uuid
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  clearedAt      DateTime? @map("cleared_at")
+  notes          String?   @db.Text
+
+  station   ScadaStation    @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  rule      ScadaAlarmRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  device    ScadaDevice?    @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  dataPoint ScadaDataPoint? @relation(fields: [dataPointId], references: [id], onDelete: SetNull)
+
+  @@index([stationId, status])
+  @@index([triggeredAt])
+  @@index([severity, status])
+  @@map("scada_alarms")
+}
+
+// ==================== أوامر التحكم ====================
+model ScadaCommand {
+  id          String    @id @default(uuid()) @db.Uuid
+  commandNo   String    @unique @map("command_no") @db.VarChar(50)
+  deviceId    String    @map("device_id") @db.Uuid
+  commandType String    @map("command_type") @db.VarChar(30) // open, close, reset, setpoint
+  targetValue String?   @map("target_value") @db.VarChar(100)
+  reason      String?   @db.Text
+  status      String    @default("pending") @db.VarChar(20) // pending, sent, executed, failed, rejected
+  requestedBy String    @map("requested_by") @db.Uuid
+  requestedAt DateTime  @default(now()) @map("requested_at")
+  approvedBy  String?   @map("approved_by") @db.Uuid
+  approvedAt  DateTime? @map("approved_at")
+  executedAt  DateTime? @map("executed_at")
+  response    String?   @db.Text
+
+  device ScadaDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@index([status])
+  @@index([requestedAt])
+  @@map("scada_commands")
+}
+
+// ==================== إعدادات الاتصال ====================
+model ScadaConnection {
+  id               String    @id @default(uuid()) @db.Uuid
+  stationId        String    @unique @map("station_id") @db.Uuid
+  protocol         String    @db.VarChar(30) // modbus_tcp, modbus_rtu, iec61850, dnp3
+  ipAddress        String?   @map("ip_address") @db.VarChar(50)
+  port             Int?
+  slaveId          Int?      @map("slave_id")
+  comPort          String?   @map("com_port") @db.VarChar(20)
+  baudRate         Int?      @map("baud_rate")
+  pollInterval     Int       @default(5) @map("poll_interval") // ثواني
+  timeout          Int       @default(3000) // مللي ثانية
+  isEnabled        Boolean   @default(true) @map("is_enabled")
+  lastConnectAt    DateTime? @map("last_connect_at")
+  connectionStatus String    @default("disconnected") @map("connection_status") @db.VarChar(20)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  station ScadaStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  @@map("scada_connections")
+}
+
+// ==================== سجل الأحداث ====================
+model ScadaEventLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(50) // READING, ALARM, COMMAND, CONNECTION, SYSTEM
+  entityType  String   @map("entity_type") @db.VarChar(50) // station, device, alarm, command
+  entityId    String?  @map("entity_id") @db.Uuid
+  description String   @db.Text
+  details     Json?
+  userId      String?  @map("user_id") @db.Uuid
+  ipAddress   String?  @map("ip_address") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([eventType, createdAt])
+  @@index([entityType, entityId])
+  @@map("scada_event_logs")
+}
+
+// ==================== إعدادات النظام ====================
+model ScadaSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  type      String   @db.VarChar(20) // string, number, boolean, json
+  category  String   @db.VarChar(50) // general, alarm, notification, modbus
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("scada_settings")
 }
